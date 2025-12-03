@@ -2,7 +2,6 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
-import { selectDevice } from './device-selection';
 
 const MessageSchema = z.object({
   role: z.enum(['user', 'model']),
@@ -26,7 +25,6 @@ export const localLlamaChatFlow = ai.defineFlow(
     outputSchema: ChatOutputSchema,
   },
   async ({ history, message }) => {
-    const { device } = await selectDevice();
 
     const systemPrompt = "You are Local Llama, a helpful AI assistant running on the user's local machine. Be friendly, concise, and helpful.";
 
@@ -36,15 +34,15 @@ export const localLlamaChatFlow = ai.defineFlow(
         ...history,
         { role: 'user', content: message },
       ],
-      model: 'gemini-2.5-flash',
+      model: 'meta-llama/Llama-3.2-1B-Instruct',
       config: {
         temperature: 0.7,
       },
     });
 
     return {
-      response: llmResponse.text(),
-      device: device,
+      response: llmResponse.text,
+      device: 'CPU',
     };
   }
 );
