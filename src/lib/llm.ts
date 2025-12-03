@@ -20,9 +20,7 @@ async function getLlama() {
 
 export async function askLLM(prompt: string): Promise<string> {
     const llama = await getLlama();
-    const template = `A chat between a user and an assistant.
-    USER: ${prompt}
-    ASSISTANT:`;
+    const template = `USER: ${prompt}\nASSISTANT:`;
     const response = await llama.createCompletion({
         prompt: template,
         numPredict: 128,
@@ -30,7 +28,6 @@ export async function askLLM(prompt: string): Promise<string> {
         topP: 0.1,
         topK: 40,
         repeatPenalty: 1,
-        stopSequence: ["USER:", "\n"],
     });
 
     return response.token;
