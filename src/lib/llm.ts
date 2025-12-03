@@ -1,26 +1,37 @@
-import { LlamaModel, LlamaContext, LlamaChatSession } from "llama-node";
+import { LLama } from "llama-node";
+import { LLamaCpp } from "llama-node/dist/llm/llama-cpp.js";
 import * as path from "path";
 
-let session: LlamaChatSession | null = null;
+let llama: LLama | null = null;
 
-async function getSession() {
-    if (session) {
-        return session;
+async function getLlama() {
+    if (llama) {
+        return llama;
     }
-    const model = new LlamaModel({
-        modelPath: path.join(process.cwd(), "models/llama-3.2-1b-instruct.Q4_K_M.gguf"),
-    });
-    const context = new LlamaContext({ model });
-    session = new LlamaChatSession({ context });
-    return session;
+    const model = path.join(process.cwd(), "models/llama-3.2-1b-instruct.Q4_K_M.gguf");
+    const llamaCpp = new LLamaCpp();
+    
+    llama = new LLama(llamaCpp);
+
+    await llama.load({ modelPath: model });
+
+    return llama;
 }
 
-
 export async function askLLM(prompt: string): Promise<string> {
-    const session = await getSession();
-    const reply = await session.prompt(prompt, {
-        maxTokens: 300,
+    const llama = await getLlama();
+    const template = `A chat between a user and an assistant.
+    USER: ${prompt}
+    ASSISTANT:`;
+    const response = await llama.createCompletion({
+        prompt: template,
+        numPredict: 128,
         temperature: 0.7,
+        topP: 0.1,
+        topK: 40,
+        repeatPenalty: 1,
+        stopSequence: ["USER:", "\n"],
     });
-    return reply;
+
+    return response.token;
 }
