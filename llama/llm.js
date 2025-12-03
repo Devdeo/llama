@@ -1,36 +1,41 @@
-
 import { LlamaModel, LlamaContext, LlamaChatSession } from "llama-node";
-import { LLamaCpp } from "llama-node/dist/llm/llama-cpp.js";
 import * as path from "path";
 
-let model = null;
-let context = null;
+let modelInstance = global.modelInstance || null;
+let contextInstance = global.contextInstance || null;
 
-async function getLlama() {
-    if (!model) {
-        const modelPath = path.join(process.cwd(), "models/llama-3.2-1b-instruct.Q4_K_M.gguf");
-        model = new LlamaModel({
-            modelPath: modelPath,
-            gpuLayers: 0,
-            nCtx: 2048,
-            useMlock: true,
-            seed: 42
-        });
-    }
-    if (!context) {
-        context = new LlamaContext({ model });
-    }
-    return { model, context };
-}
+const MODEL = path.join(process.cwd(), "models/llama-3.2-1b-instruct.Q4_K_M.gguf");
+const TOKENIZER = path.join(process.cwd(), "models/tokenizer.model");
 
-export async function askLLM(prompt) {
-    const { context } = await getLlama();
-    const session = new LlamaChatSession({ context });
+export async function loadLLM() {
+  if (!modelInstance) {
+    console.log("Loading model from:", MODEL);
 
-    const response = await session.prompt(prompt, {
-        maxTokens: 1024,
-        temperature: 0.7,
+    modelInstance = new LlamaModel({
+      modelPath: MODEL,
+      tokenizerPath: TOKENIZER,
+      gpuLayers: 0,
+      nCtx: 2048,
+      seed: 42,
     });
 
-    return response;
+    global.modelInstance = modelInstance;
+  }
+
+  if (!contextInstance) {
+    contextInstance = new LlamaContext({ model: modelInstance });
+    global.contextInstance = contextInstance;
+  }
+
+  return contextInstance;
+}
+
+export async function askLLM(promptText) {
+  const context = await loadLLM();
+  const session = new LlamaChatSession({ context });
+
+  return session.prompt(promptText, {
+    maxTokens: 250,
+    temperature: 0.7,
+  });
 }
