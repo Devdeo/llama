@@ -1,81 +1,95 @@
 'use client';
 
-import { useState, useTransition, useRef, useEffect } from 'react';
-import type { Message } from './types';
-import { generateResponse } from './actions';
-import ChatList from '@/components/chat-list';
-import ChatInput from '@/components/chat-input';
-import { Card } from '@/components/ui/card';
+import { useState } from "react";
 
-const initialMessages: Message[] = [
-  {
-    id: '1',
-    role: 'model',
-    content: "Hello! I am Local Llama. How can I help you today?",
-  },
-];
+export default function ChatPage() {
+  const [messages, setMessages] = useState<{ role: string, text: string }[]>([]);
+  const [input, setInput] = useState("");
 
-export default function Home() {
-  const [messages, setMessages] = useState<Message[]>(initialMessages);
-  const [device, setDevice] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [isPending, startTransition] = useTransition();
+  async function sendMessage() {
+    if (!input.trim()) return;
 
-  const handleSubmit = (formData: FormData) => {
-    const messageContent = formData.get('message') as string;
-    if (!messageContent.trim()) return;
+    const userMsg = { role: "user", text: input };
+    setMessages((prev) => [...prev, userMsg]);
+    const currentInput = input;
+    setInput("");
 
-    const newUserMessage: Message = {
-      id: crypto.randomUUID(),
-      role: 'user',
-      content: messageContent,
-    };
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ msg: currentInput }),
+      });
 
-    const newMessages = [...messages, newUserMessage];
-    setMessages(newMessages);
-    setError(null);
-
-    startTransition(async () => {
-      const result = await generateResponse(messages, messageContent);
-      if (result.error) {
-        setError(result.error);
-        // remove user message on error
-        setMessages(messages)
-        return
+      if (!res.ok) {
+        console.error("API error:", res.statusText);
+        const botMsg = { role: "assistant", text: "Sorry, something went wrong." };
+        setMessages((prev) => [...prev, botMsg]);
+        return;
       }
+      
+      const data = await res.json();
 
-      const aiMessage: Message = {
-        id: crypto.randomUUID(),
-        role: 'model',
-        content: result.response as string,
-      };
+      const botMsg = { role: "assistant", text: data.reply };
+      setMessages((prev) => [...prev, botMsg]);
+    } catch(e) {
+        console.error(e);
+        const botMsg = { role: "assistant", text: "Sorry, something went wrong." };
+        setMessages((prev) => [...prev, botMsg]);
+    }
+  }
 
-      setMessages((prev) => [...prev, aiMessage]);
-      setDevice(result.device as string);
-    });
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Enter') {
+      sendMessage();
+    }
   };
 
   return (
-    <div className="flex flex-col h-screen bg-background">
-      <header className="p-4 border-b w-full flex justify-center items-center">
-        <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold font-headline text-foreground">Local Llama Chat</h1>
-        </div>
-      </header>
-      <main className="flex-1 flex justify-center py-6 px-4">
-        <Card className="w-full max-w-3xl flex flex-col shadow-lg">
-          <ChatList messages={messages} />
-          <div className="p-4 border-t">
-            <ChatInput onSubmit={handleSubmit} isPending={isPending} />
-            {error && <p className="text-destructive text-sm mt-2">{error}</p>}
-            {device && !isPending && !error && (
-              <p className="text-muted-foreground text-xs mt-2 text-center">
-                Inference on: {device}
-              </p>
-            )}
+    <div style={{ width: "600px", margin: "50px auto", fontFamily: "Arial" }}>
+      <h2>Chat with Llama 1B</h2>
+
+      <div style={{
+        border: "1px solid #ccc",
+        borderRadius: "8px",
+        padding: "16px",
+        height: "400px",
+        overflowY: "auto",
+        marginBottom: "20px",
+        display: "flex",
+        flexDirection: "column"
+      }}>
+        {messages.map((m, i) => (
+          <div key={i} style={{ alignSelf: m.role === "user" ? "flex-end" : "flex-start", marginBottom: '10px' }}>
+            <p style={{margin: 0}}><b>{m.role === 'user' ? 'You' : 'Llama'}:</b></p>
+            <div style={{
+                background: m.role === 'user' ? '#dcf8c6' : '#f1f0f0',
+                padding: '10px',
+                borderRadius: '10px',
+                maxWidth: '450px',
+                wordWrap: 'break-word',
+                textAlign: 'left'
+            }}>
+             {m.text}
+            </div>
           </div>
-        </Card>
-      </main>
+        ))}
+      </div>
+
+      <div style={{display: 'flex'}}>
+        <input
+          style={{ flex: 1, padding: "10px", borderRadius: '5px', border: '1px solid #ccc' }}
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={handleKeyDown}
+        />
+        <button
+          style={{ padding: "10px 20px", marginLeft: "10px", borderRadius: '5px', border: 'none', background: '#007bff', color: 'white', cursor: 'pointer' }}
+          onClick={sendMessage}
+        >
+          Send
+        </button>
+      </div>
     </div>
   );
 }

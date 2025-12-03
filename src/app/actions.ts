@@ -1,15 +1,23 @@
 'use server';
 
-import { localLlamaChatFlow } from '@/ai/flows/chat';
 import type { Message } from './types';
 
 export async function generateResponse(history: Message[], message: string) {
   try {
-    const { response, device } = await localLlamaChatFlow({
-      history: history.map(({ role, content }) => ({ role, content })),
-      message,
+    const res = await fetch(`${process.env.NEXT_PUBLIC_URL}/api/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ msg: message }),
     });
-    return { response, device };
+
+    if (!res.ok) {
+      const errorData = await res.json();
+      return { error: errorData.error || 'An unknown error occurred.' };
+    }
+
+    const data = await res.json();
+
+    return { response: data.reply, device: 'CPU' };
   } catch (error) {
     console.error(error);
     return { error: 'An error occurred while generating a response.' };
