@@ -1,34 +1,31 @@
-import { LLama } from "llama-node";
+import { LlamaModel, LlamaContext, LlamaChatSession } from "llama-node";
 import { LLamaCpp } from "llama-node/dist/llm/llama-cpp.js";
 import * as path from "path";
 
-let llama: LLama | null = null;
+let model: LlamaModel;
+let context: LlamaContext;
 
 async function getLlama() {
-    if (llama) {
-        return llama;
+    if (!model) {
+        const modelPath = path.join(process.cwd(), "models/llama-3.2-1b-instruct.Q4_K_M.gguf");
+        model = new LlamaModel({
+            modelPath: modelPath,
+        });
     }
-    const model = path.join(process.cwd(), "models/llama-3.2-1b-instruct.Q4_K_M.gguf");
-    const llamaCpp = new LLamaCpp();
-    
-    llama = new LLama(llamaCpp);
-
-    await llama.load({ modelPath: model });
-
-    return llama;
+    if (!context) {
+        context = new LlamaContext({ model });
+    }
+    return { model, context };
 }
 
 export async function askLLM(prompt: string): Promise<string> {
-    const llama = await getLlama();
-    const template = `USER: ${prompt}\nASSISTANT:`;
-    const response = await llama.createCompletion({
-        prompt: template,
-        numPredict: 128,
+    const { context } = await getLlama();
+    const session = new LlamaChatSession({ context });
+
+    const response = await session.prompt(prompt, {
+        maxTokens: 300,
         temperature: 0.7,
-        topP: 0.1,
-        topK: 40,
-        repeatPenalty: 1,
     });
 
-    return response.token;
+    return response;
 }
